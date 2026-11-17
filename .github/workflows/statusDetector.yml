@@ -1,0 +1,39 @@
+name: Website Uptime Check
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+jobs:
+  check-sites:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # List the exact NAMES of your secrets here, not ${{ secrets... }}
+        secret_name:
+          - BOOKSHELF_URL
+          - BOWL_URL
+          - HOME_ASSISTANT_URL
+          - IMMICH_URL
+          - MEMOS_URL
+
+    steps:
+      - name: Check HTTP status for ${{ matrix.secret_name }}
+        env:
+          # Dynamically fetch the secret value using bracket notation
+          TARGET_URL: ${{ secrets[matrix.secret_name] }}
+        run: |
+          if [ -z "$TARGET_URL" ]; then
+            echo "::error::Secret ${{ matrix.secret_name }} is empty or missing!"
+            exit 1
+          fi
+
+          STATUS=$(curl -L -s -o /dev/null -w "%{http_code}" --max-time 15 "$TARGET_URL")
+          echo "Checked ${{ matrix.secret_name }} - Status: $STATUS"
+          
+          if [ "$STATUS" -lt 200 ] || [ "$STATUS" -ge 300 ]; then
+            echo "::error::${{ matrix.secret_name }} is DOWN! Returned HTTP $STATUS"
+            exit 1
+          fi
